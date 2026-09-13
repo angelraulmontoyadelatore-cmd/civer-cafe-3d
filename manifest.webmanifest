@@ -1,0 +1,9 @@
+{
+  "name": "Ciber Café 3D",
+  "short_name": "Ciber Café",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "orientation": "landscape"
+}
