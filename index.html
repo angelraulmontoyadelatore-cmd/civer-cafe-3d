@@ -13,7 +13,7 @@ canvas{display:block;width:100%;height:100%}
 #hint{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);background:#151923e8;padding:10px 16px;border-radius:12px;display:none;font-weight:bold}
 #joystick{position:absolute;left:22px;bottom:24px;width:130px;height:130px;border-radius:50%;background:#ffffff22;border:2px solid #ffffff44;pointer-events:auto}
 #stick{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;background:#ffffff66}
-#interact{position:absolute;right:24px;bottom:38px;width:90px;height:90px;border:0;border-radius:50%;background:#713cff;color:#fff;font-size:16px;font-weight:bold;pointer-events:auto;display:none}
+#shop{position:absolute;right:24px;top:92px;background:#151923e8;color:#fff;border:0;border-radius:14px;padding:12px 16px;font-weight:bold;font-size:15px;pointer-events:auto}#interact{position:absolute;right:24px;bottom:38px;width:90px;height:90px;border:0;border-radius:50%;background:#713cff;color:#fff;font-size:16px;font-weight:bold;pointer-events:auto;display:none}
 #start{position:absolute;inset:0;background:#10131aee;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:auto}
 #start h1{font-size:34px;margin:0 0 10px}
 #start p{opacity:.8;text-align:center;max-width:330px;line-height:1.4}
@@ -37,6 +37,7 @@ canvas { width:100vw !important; height:100vh !important; }
 <div id="ui">
   <div id="money">💰 $1000</div>
   <div id="day">Día 1 · 08:00</div>
+  <button id="shop">🛒 TIENDA</button>
   <div id="hint"></div>
   <div id="joystick"><div id="stick"></div></div>
   <button id="interact">USAR</button>
@@ -58,7 +59,7 @@ function sh(t,s){let x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(
 const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
 const locP=gl.getAttribLocation(pr,'p'),locC=gl.getAttribLocation(pr,'col'),locM=gl.getUniformLocation(pr,'mvp');
 
-function matMul(a,b){let r=new Float32Array(16);for(let c=0;c<4;c++)for(let r0=0;r0<4;r0++)for(let k=0;k<4;k++)r[c*4+r0]+=a[k*4+r0]*b[c*4+k];return r}
+function matMul(a,b){let r=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++)for(let k=0;k<4;k++)r[i*4+j]+=a[i*4+k]*b[k*4+j];return r}
 function persp(f,a,n,fz){let t=1/Math.tan(f/2);return new Float32Array([t/a,0,0,0,0,t,0,0,0,0,(fz+n)/(n-fz),-1,0,0,2*fz*n/(n-fz),0])}
 function look(eye,at){let z=[eye[0]-at[0],eye[1]-at[1],eye[2]-at[2]],zl=Math.hypot(...z);z=z.map(v=>v/zl);let up=[0,1,0],x=[up[1]*z[2]-up[2]*z[1],up[2]*z[0]-up[0]*z[2],up[0]*z[1]-up[1]*z[0]],xl=Math.hypot(...x);x=x.map(v=>v/xl);let y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];
 return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]),1])}
@@ -73,14 +74,15 @@ function mesh(name,col){let d=cubeData(col);let b=gl.createBuffer();gl.bindBuffe
 mesh('floor',[.10,.38,.12]); mesh('wall',[.32,.34,.38]); mesh('desk',[.36,.20,.10]); mesh('pc',[.08,.35,.65]); mesh('player',[.65,.10,.75]); mesh('chair',[.12,.12,.14]); mesh('customer',[.85,.65,.12]);
 
 function draw(name,x,y,z,sx,sy,sz,VP){let m=matMul(VP,model(x,y,z,sx,sy,sz));gl.uniformMatrix4fv(locM,false,m);let q=meshes[name];gl.bindBuffer(gl.ARRAY_BUFFER,q.b);gl.enableVertexAttribArray(locP);gl.vertexAttribPointer(locP,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,q.cb);gl.enableVertexAttribArray(locC);gl.vertexAttribPointer(locC,3,gl.FLOAT,false,0,0);gl.drawArrays(gl.TRIANGLES,0,q.n)}
-let player={x:0,y:0.55,z:3.0}, customers=[{x:-2.8,z:-2.2,t:0},{x:2.7,z:-2.3,t:0}], money=1000, activePC=-1, time=0;
-const pcs=[[-2.8,-2.7],[0,-2.7],[2.8,-2.7]];
+let player={x:0,y:0.55,z:3.0}, customers=[{x:-2.8,z:-2.2,t:0},{x:2.7,z:-2.3,t:0}], money=1000, activePC=-1, time=0, extraPC=false;
+const pcs=[[-2.8,-2.7],[0,-2.7],[2.8,-2.7],[0,-0.8]];
 let joy={x:0,y:0}, touching=false;
 const js=document.getElementById('joystick'),st=document.getElementById('stick');
 function joySet(e){let r=js.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,d=Math.hypot(x,y),m=43;if(d>m){x=x/d*m;y=y/d*m}joy.x=x/m;joy.y=y/m;st.style.transform=`translate(${x}px,${y}px)`}
 js.addEventListener('pointerdown',e=>{touching=true;js.setPointerCapture(e.pointerId);joySet(e)});js.addEventListener('pointermove',e=>{if(touching)joySet(e)});js.addEventListener('pointerup',()=>{touching=false;joy.x=joy.y=0;st.style.transform='translate(0,0)'});
 
-const inter=document.getElementById('interact'),hint=document.getElementById('hint');
+const inter=document.getElementById('interact'),hint=document.getElementById('hint'),shop=document.getElementById('shop');
+shop.onclick=()=>{if(extraPC){hint.style.display='block';hint.textContent='Ya compraste la PC extra';return} if(money>=300){money-=300;extraPC=true;document.getElementById('money').textContent='💰 $'+money;hint.style.display='block';hint.textContent='¡Compraste una PC nueva!';}else{hint.style.display='block';hint.textContent='Necesitas $300 para comprarla'}setTimeout(updateHint,1800)};
 function dist(a,b){return Math.hypot(a.x-b[0],a.z-b[1])}
 function updateHint(){let best=-1,bd=99;pcs.forEach((p,i)=>{let d=dist(player,p);if(d<bd){bd=d;best=i}});if(bd<1.45){activePC=best;inter.style.display='block';hint.style.display='block';hint.textContent='PC disponible · toca USAR'}else{activePC=-1;inter.style.display='none';hint.style.display='none'}}
 inter.onclick=()=>{if(activePC>=0){money+=25; pcs[activePC][0]+=0; document.getElementById('money').textContent='💰 $'+money; hint.textContent='¡Ganaste $25! Cliente atendido';setTimeout(updateHint,1200)}};
@@ -95,7 +97,7 @@ function frame(){
  draw('floor',0,-.12,0,12,.2,9,VP);
  // walls only around the actual café
  draw('wall',-6,1,0,.25,2,9,VP);draw('wall',6,1,0,.25,2,9,VP);draw('wall',0,1,-4.5,12,2,.25,VP);
- pcs.forEach(p=>{draw('desk',p[0],.45,p[1],2.0,.35,1.1,VP);draw('pc',p[0],1.05,p[1],.65,1.0,.12,VP);draw('chair',p[0],.35,p[1]+.9,.8,.5,.8,VP)});
+ pcs.forEach((p,i)=>{if(i===3 && !extraPC)return;draw('desk',p[0],.45,p[1],2.0,.35,1.1,VP);draw('pc',p[0],1.05,p[1],.65,1.0,.12,VP);draw('chair',p[0],.35,p[1]+.9,.8,.5,.8,VP)});
  customers.forEach(q=>draw('customer',q.x,.55,q.z,.65,1.1,.65,VP));
  draw('player',player.x,.55,player.z,.65,1.1,.65,VP);
  document.getElementById('day').textContent='Día 1 · '+String(8+Math.floor(time/30)).padStart(2,'0')+':'+String(Math.floor(time*2)%60).padStart(2,'0');
@@ -103,5 +105,147 @@ function frame(){
 }
 document.querySelector('#start button').onclick=()=>{document.getElementById('start').style.display='none';frame()};
 </script>
+
+<script>
+(() => {
+  const state = {
+    money: 1000, day: 1, rep: 1, pcs: 3, chairs: 3, employees: 0,
+    electricity: 20, repairs: 0, customers: 0, served: 0, level: 1,
+    rent: 50, savingKey: "ciberCafeCompletoV1"
+  };
+  try { Object.assign(state, JSON.parse(localStorage.getItem(state.savingKey) || "{}")); } catch(e) {}
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #cc-panel{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.65);z-index:9999;font-family:Arial,sans-serif}
+    #cc-box{width:min(92vw,520px);max-height:82vh;overflow:auto;background:#111827;color:#fff;
+      border:2px solid #374151;border-radius:18px;padding:18px;box-shadow:0 18px 50px #0008}
+    #cc-box h2{margin:0 0 12px}.cc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .cc-btn{border:0;border-radius:12px;padding:13px;background:#2563eb;color:white;font-weight:700}
+    .cc-btn:disabled{opacity:.45}.cc-close{background:#4b5563}.cc-stat{background:#1f2937;padding:10px;border-radius:10px}
+    #cc-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:10000;
+      background:#111827;color:#fff;padding:10px 15px;border-radius:12px;display:none;font-weight:700}
+    #cc-menu{position:fixed;right:12px;top:12px;z-index:9000;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+    #cc-menu button{border:0;border-radius:10px;padding:9px 11px;background:#111827dd;color:#fff;font-weight:700}
+  `;
+  document.head.appendChild(style);
+
+  const menu = document.createElement("div");
+  menu.id = "cc-menu";
+  menu.innerHTML = `<button data-open="shop">🛒 Tienda</button>
+    <button data-open="business">📊 Negocio</button><button data-open="missions">🎯 Misiones</button>`;
+  document.body.appendChild(menu);
+
+  const panel = document.createElement("div"); panel.id="cc-panel";
+  panel.innerHTML = `<div id="cc-box"><h2 id="cc-title"></h2><div id="cc-content"></div></div>`;
+  document.body.appendChild(panel);
+  const toast=document.createElement("div"); toast.id="cc-toast"; document.body.appendChild(toast);
+
+  function save(){ localStorage.setItem(state.savingKey, JSON.stringify(state)); }
+  function money(n){return "$"+Math.round(n).toLocaleString("es-MX")}
+  function say(t){toast.textContent=t;toast.style.display="block";clearTimeout(say.t);say.t=setTimeout(()=>toast.style.display="none",1800);save();updateHUD();}
+  function updateHUD(){
+    // Update any existing money/day labels heuristically.
+    [...document.querySelectorAll("*")].forEach(el=>{
+      if(el.children.length===0 && typeof el.textContent==="string"){
+        if(/\$1000|\$1025|\$[0-9,]+/.test(el.textContent) && el.textContent.length<30) el.textContent=money(state.money);
+      }
+    });
+  }
+  function open(title, html){
+    document.getElementById("cc-title").textContent=title;
+    document.getElementById("cc-content").innerHTML=html;
+    panel.style.display="flex";
+  }
+  function close(){panel.style.display="none"}
+  panel.addEventListener("click",e=>{if(e.target===panel)close()});
+
+  function shop(){
+    open("🛒 Tienda", `<div class="cc-grid">
+      <div class="cc-stat">💰 Dinero<br><b>${money(state.money)}</b></div>
+      <div class="cc-stat">💻 PCs<br><b>${state.pcs}</b></div>
+    </div><br><div class="cc-grid">
+      <button class="cc-btn" data-buy="pc">💻 PC nueva<br>$300</button>
+      <button class="cc-btn" data-buy="chair">🪑 Silla<br>$80</button>
+      <button class="cc-btn" data-buy="repair">🔧 Reparar PC<br>$120</button>
+      <button class="cc-btn" data-buy="employee">👨‍💼 Empleado<br>$500</button>
+      <button class="cc-btn" data-buy="expand">🏪 Ampliar local<br>$1200</button>
+      <button class="cc-btn" data-buy="upgrade">⭐ Mejorar negocio<br>$750</button>
+    </div><br><button class="cc-btn cc-close" data-close>Cerrar</button>`);
+  }
+
+  function business(){
+    const income=state.served*25, expenses=state.rent+state.electricity*2+state.employees*20;
+    open("📊 Mi Ciber Café", `<div class="cc-grid">
+      <div class="cc-stat">💰 Dinero<br><b>${money(state.money)}</b></div>
+      <div class="cc-stat">⭐ Nivel<br><b>${state.level}</b></div>
+      <div class="cc-stat">👥 Clientes atendidos<br><b>${state.served}</b></div>
+      <div class="cc-stat">💻 Computadoras<br><b>${state.pcs}</b></div>
+      <div class="cc-stat">👨‍💼 Empleados<br><b>${state.employees}</b></div>
+      <div class="cc-stat">⚡ Electricidad<br><b>${state.electricity}</b></div>
+    </div><p>Ingresos históricos: ${money(income)}<br>Gastos estimados/día: ${money(expenses)}</p>
+    <button class="cc-btn" data-endday>🌙 Terminar día</button>
+    <button class="cc-btn cc-close" data-close>Cerrar</button>`);
+  }
+
+  function missions(){
+    const tasks=[
+      ["💻 Tener 5 computadoras",state.pcs>=5,"$500"],
+      ["👥 Atender 10 clientes",state.served>=10,"$750"],
+      ["⭐ Llegar al nivel 3",state.level>=3,"$1000"]
+    ];
+    open("🎯 Misiones", tasks.map((x,i)=>`<div class="cc-stat" style="margin:8px 0">
+      ${x[1]?"✅":"⬜"} ${x[0]} — recompensa ${x[2]}</div>`).join("")+
+      `<br><button class="cc-btn cc-close" data-close>Cerrar</button>`);
+  }
+
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    if(b.dataset.open==="shop")shop();
+    if(b.dataset.open==="business")business();
+    if(b.dataset.open==="missions")missions();
+    if(b.dataset.close!==undefined)close();
+    const buy=b.dataset.buy;
+    if(buy){
+      const costs={pc:300,chair:80,repair:120,employee:500,expand:1200,upgrade:750};
+      const c=costs[buy];
+      if(state.money<c)return say("💸 No tienes suficiente dinero");
+      state.money-=c;
+      if(buy==="pc")state.pcs++;
+      if(buy==="chair")state.chairs++;
+      if(buy==="repair"){state.repairs=Math.max(0,state.repairs-1);state.electricity=Math.max(5,state.electricity-1)}
+      if(buy==="employee")state.employees++;
+      if(buy==="expand")state.rep+=2;
+      if(buy==="upgrade"){state.level++;state.rep+=3}
+      say("✅ Compra realizada"); shop();
+    }
+    if(b.dataset.endday!==undefined){
+      const income=state.served*25+state.employees*35;
+      const expenses=state.rent+state.electricity*2+state.employees*20;
+      state.money+=income-expenses; state.day++; state.customers=0;
+      state.electricity=Math.min(100,state.electricity+10);
+      if(state.served>=state.level*5)state.level++;
+      say(`🌅 Día ${state.day} — balance ${money(income-expenses)}`); business();
+    }
+  });
+
+  // Interaction with the existing USE button: add a small business progression hook.
+  const oldMoneyTexts=new Set();
+  setInterval(()=>{
+    const use=[...document.querySelectorAll("button")].find(x=>/USAR/i.test(x.textContent||""));
+    if(use && !use.dataset.ccHook){
+      use.dataset.ccHook="1";
+      use.addEventListener("click",()=>{
+        state.money+=25; state.served++; state.customers++;
+        if(state.served%5===0)state.rep++;
+        save(); setTimeout(updateHUD,30);
+      });
+    }
+  },500);
+  save(); updateHUD();
+})();
+</script>
+
 </body>
 </html>
